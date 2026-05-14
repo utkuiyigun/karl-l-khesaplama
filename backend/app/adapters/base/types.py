@@ -59,3 +59,16 @@ class Order:
     customer_id: int             # İç müşteri ID
     platform_connection_id: int
     packages: list[ShipmentPackage] = field(default_factory=list)
+
+
+@dataclass
+class CustomerProfile:
+    """
+    Hesaplama motorunun müşteriye özgü vergi/maliyet bilgisini görmesi için
+    platform-agnostik profil. DB Customer modeli'nden servis katmanında türetilir.
+
+    Default değerler 'Senaryo A-E' davranışını korur (stopaj yok, KDV gider sayılır).
+    """
+    stopaj_rate: Decimal = field(default_factory=lambda: Decimal("0"))
+    is_vat_registered: bool = True
+    default_shipping_cost: Decimal = field(default_factory=lambda: Decimal("0"))

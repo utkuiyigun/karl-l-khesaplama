@@ -16,7 +16,13 @@ from decimal import Decimal
 
 import pytest
 
-from app.adapters.base.types import Order, OrderItem, PackageStatus, ShipmentPackage
+from app.adapters.base.types import (
+    CustomerProfile,
+    Order,
+    OrderItem,
+    PackageStatus,
+    ShipmentPackage,
+)
 from app.calculators.profit import (
     calculate_item_profit,
     calculate_order_profit,
@@ -280,15 +286,77 @@ def test_empty_order_is_not_realized() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Faz 2.3'te
+# Senaryo G — Stopaj (customer profile ile)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="TODO[2.3]: KDV mükellef değil — customer profile parametresi gerekir")
+def test_senaryo_g_stopajli(simple_delivered_item: OrderItem) -> None:
+    """
+    Senaryo G — STOPAJ.
+
+    Senaryo A baseline + stopaj_rate=0.05 → paket net'inden %5 stopaj kesilir.
+        base_net = 12.14
+        stopaj   = 12.14 × 0.05 = 0.607 → 0.61
+        final    = 12.14 - 0.61          = 11.53
+    """
+    package = ShipmentPackage(
+        external_id="pkg-g",
+        status=PackageStatus.DELIVERED,
+        items=[simple_delivered_item],
+        package_service_fee=Decimal("13.19"),
+    )
+    profile = CustomerProfile(stopaj_rate=Decimal("0.05"))
+    r = calculate_package_profit(package, profile=profile)
+    assert r.stopaj == Decimal("0.61")
+    assert r.net_profit == Decimal("11.53")
+
+
+def test_stopaj_not_applied_to_negative_net(simple_delivered_item: OrderItem) -> None:
+    """Returned paket için adjusted_net negatif → stopaj uygulanmaz (zarara stopaj olmaz)."""
+    package = ShipmentPackage(
+        external_id="pkg-returned",
+        status=PackageStatus.RETURNED,
+        items=[simple_delivered_item],
+        package_service_fee=Decimal("13.19"),
+    )
+    profile = CustomerProfile(stopaj_rate=Decimal("0.05"))
+    r = calculate_package_profit(package, profile=profile)
+    assert r.stopaj == Decimal("0.00")
+    assert r.net_profit == Decimal("-13.19")
+
+
+def test_stopaj_propagates_to_order_total(simple_delivered_item: OrderItem) -> None:
+    """calculate_order_profit profile'ı paketlere geçirir, order.stopaj = sum(pkg.stopaj)."""
+    package = ShipmentPackage(
+        external_id="pkg-ord-g",
+        status=PackageStatus.DELIVERED,
+        items=[simple_delivered_item],
+        package_service_fee=Decimal("13.19"),
+    )
+    order = Order(
+        external_id="ord-g",
+        order_date=datetime(2026, 5, 14, tzinfo=timezone.utc),
+        customer_id=1,
+        platform_connection_id=1,
+        packages=[package],
+    )
+    profile = CustomerProfile(stopaj_rate=Decimal("0.05"))
+    r = calculate_order_profit(order, profile=profile)
+    assert r.stopaj == Decimal("0.61")
+    assert r.net_profit == Decimal("11.53")
+
+
+# ---------------------------------------------------------------------------
+# Senaryo F — KDV mükellef değil
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skip(
+    reason=(
+        "MVP basit KDV modu — HESAPLAMA §6'da 'MVP'de basit mod, gelişmiş ayar olarak işaretle' "
+        "denildiği için KDV mahsuplaşması ileri faza bırakıldı. CustomerProfile.is_vat_registered "
+        "alanı şimdilik referans için var; davranışı yok."
+    )
+)
 def test_senaryo_f_kdv_mukellef_degil() -> None:
-    pass
-
-
-@pytest.mark.skip(reason="TODO[2.3]: stopajlı — customer.stopaj_rate parametresi gerekir")
-def test_senaryo_g_stopajli() -> None:
     pass

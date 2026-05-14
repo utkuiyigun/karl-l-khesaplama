@@ -14,7 +14,13 @@ Yuvarlama:
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
-from app.adapters.base.types import Order, OrderItem, PackageStatus, ShipmentPackage
+from app.adapters.base.types import (
+    CustomerProfile,
+    Order,
+    OrderItem,
+    PackageStatus,
+    ShipmentPackage,
+)
 
 TWO_DP = Decimal("0.01")
 ZERO = Decimal("0")
@@ -35,8 +41,12 @@ class ProfitResult:
     service_fee: Decimal         # Platform hizmet bedeli (kalem seviyesinde 0)
     shipping_cost: Decimal       # Kargo (kalem seviyesinde 0)
     total_cogs: Decimal          # Toplam alış maliyeti
-    net_profit: Decimal          # NET KÂR (statü düzeltmesi uygulanmış)
+    net_profit: Decimal          # NET KÂR (statü + stopaj düzeltmesi uygulanmış)
     is_realized: bool            # True: tahsil edildi (Delivered/Shipped/Returned)
+    stopaj: Decimal = Decimal("0.00")  # Kesilen stopaj tutarı (varsa)
+
+
+_DEFAULT_PROFILE = CustomerProfile()
 
 
 def calculate_item_profit(item: OrderItem) -> ProfitResult:
@@ -68,9 +78,12 @@ def calculate_item_profit(item: OrderItem) -> ProfitResult:
     )
 
 
-def calculate_package_profit(package: ShipmentPackage) -> ProfitResult:
+def calculate_package_profit(
+    package: ShipmentPackage,
+    profile: CustomerProfile = _DEFAULT_PROFILE,
+) -> ProfitResult:
     """
-    Paket bazında net kâr (HESAPLAMA §2.2 + §2.3).
+    Paket bazında net kâr (HESAPLAMA §2.2 + §2.3 + §7).
 
     Statüye göre düzeltme:
     - Cancelled  → net_profit = 0 (sipariş hiç gerçekleşmedi)
@@ -78,6 +91,10 @@ def calculate_package_profit(package: ShipmentPackage) -> ProfitResult:
                    COGS depoya döner, ama hizmet bedeli ve kargo zararı kalır)
     - Delivered / Shipped → raw_net, is_realized=True
     - Pending             → raw_net, is_realized=False
+
+    Stopaj (HESAPLAMA §7): profile.stopaj_rate > 0 ise ve adjusted_net > 0 ise,
+    stopaj_amount = adjusted_net × rate paket net'inden düşülür. Zarara stopaj
+    uygulanmaz (yatırım/komisyon stopajı pozitif tahsile uygulanır).
     """
     item_results = [calculate_item_profit(item) for item in package.items]
 
@@ -102,6 +119,12 @@ def calculate_package_profit(package: ShipmentPackage) -> ProfitResult:
         adjusted_net = raw_net
         is_realized = False
 
+    # Stopaj: sadece pozitif net'e uygulanır
+    stopaj = ZERO
+    if profile.stopaj_rate > ZERO and adjusted_net > ZERO:
+        stopaj = adjusted_net * profile.stopaj_rate
+        adjusted_net = adjusted_net - stopaj
+
     return ProfitResult(
         gross_revenue=_q(gross_revenue),
         commission=_q(commission),
@@ -111,16 +134,21 @@ def calculate_package_profit(package: ShipmentPackage) -> ProfitResult:
         total_cogs=_q(total_cogs),
         net_profit=_q(adjusted_net),
         is_realized=is_realized,
+        stopaj=_q(stopaj),
     )
 
 
-def calculate_order_profit(order: Order) -> ProfitResult:
+def calculate_order_profit(
+    order: Order,
+    profile: CustomerProfile = _DEFAULT_PROFILE,
+) -> ProfitResult:
     """
     Tüm sipariş için toplam net kâr — paketler birleşik (HESAPLAMA §2.4).
 
+    profile paketlere propagate edilir (stopaj paket bazında uygulanır).
     is_realized: tüm paketler realized ise True. Boş paket listesinde False.
     """
-    package_results = [calculate_package_profit(pkg) for pkg in order.packages]
+    package_results = [calculate_package_profit(pkg, profile=profile) for pkg in order.packages]
 
     return ProfitResult(
         gross_revenue=_q(sum((r.gross_revenue for r in package_results), ZERO)),
@@ -131,4 +159,5 @@ def calculate_order_profit(order: Order) -> ProfitResult:
         total_cogs=_q(sum((r.total_cogs for r in package_results), ZERO)),
         net_profit=_q(sum((r.net_profit for r in package_results), ZERO)),
         is_realized=all(r.is_realized for r in package_results) if package_results else False,
+        stopaj=_q(sum((r.stopaj for r in package_results), ZERO)),
     )
