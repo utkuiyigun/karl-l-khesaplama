@@ -25,6 +25,7 @@ from app.db.session import AsyncSessionLocal
 from app.models.order import Order as OrderModel
 from app.models.order_item import OrderItem as OrderItemModel
 from app.models.platform_connection import PlatformConnection
+from app.models.product import Product
 from app.models.shipment_package import ShipmentPackage as ShipmentPackageModel
 
 OVERLAP_BUFFER = timedelta(hours=1)
@@ -146,11 +147,21 @@ async def _upsert_order(session: AsyncSession, domain_order: DomainOrder) -> Non
         await session.flush()
 
         for item in pkg.items:
+            # COGS lookup: müşteri yüklediyse Product tablosundan al, yoksa 0
+            product = (
+                await session.execute(
+                    select(Product).where(
+                        Product.customer_id == domain_order.customer_id,
+                        Product.barcode == item.barcode,
+                    )
+                )
+            ).scalar_one_or_none()
+
             item_row = OrderItemModel(
                 package_id=pkg_row.id,
                 order_id=order_row.id,
                 customer_id=domain_order.customer_id,
-                product_id=None,  # COGS eşleştirme Faz 5'te
+                product_id=product.id if product else None,
                 external_id=item.external_id,
                 barcode=item.barcode,
                 quantity=item.quantity,
@@ -159,6 +170,6 @@ async def _upsert_order(session: AsyncSession, domain_order: DomainOrder) -> Non
                 vat_rate=item.vat_rate,
                 commission_rate=item.commission_rate,
                 campaign_discount=item.campaign_discount,
-                cogs_snapshot=item.cogs,
+                cogs_snapshot=product.cogs if product else item.cogs,
             )
             session.add(item_row)
