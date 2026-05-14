@@ -81,6 +81,12 @@ DATABASE_URL="postgresql+asyncpg://melon:melon_dev@localhost:5432/melon_kar_test
 
 # 8) Worker (ayrı terminal — Trendyol polling için)
 .venv/bin/celery -A app.workers.celery_app worker --beat -l info
+
+# 9) Frontend (ayrı terminal)
+cd frontend
+npm install   # ilk seferde
+npm run dev
+# → http://localhost:3000
 ```
 
 ## API endpoint'leri (özet)
@@ -154,8 +160,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/customers/1/simulations \
 ## Stack
 
 - **Backend:** Python 3.11+, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL 16, Celery, Redis, Fernet
+- **Frontend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS
 - **Test:** pytest, pytest-asyncio, httpx ASGI transport, monkeypatch ile mock'lar
-- **Frontend:** Henüz yazılmadı (Faz 7'ye bırakıldı)
 
 ## Test sayıları
 
