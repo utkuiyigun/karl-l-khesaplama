@@ -5,12 +5,16 @@ raw_data: ham platform response. Hesaplama hatası bulunursa veya formül
 güncellenirse, paket/kalem verisi raw_data'dan yeniden türetilebilir.
 """
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.shipment_package import ShipmentPackage
 
 
 class Order(Base, TimestampMixin):
@@ -40,3 +44,9 @@ class Order(Base, TimestampMixin):
     order_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     raw_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    packages: Mapped[list["ShipmentPackage"]] = relationship(
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )

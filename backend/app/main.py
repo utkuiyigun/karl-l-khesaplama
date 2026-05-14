@@ -3,7 +3,7 @@ Melon-Kar Backend — FastAPI app entry point.
 """
 from fastapi import FastAPI
 
-from app.api.v1 import cogs, connections, customers
+from app.api.v1 import cogs, connections, customers, reports
 from app.core.config import settings
 
 app = FastAPI(
@@ -22,3 +22,4 @@ async def health() -> dict[str, str]:
 app.include_router(customers.router, prefix="/api/v1")
 app.include_router(connections.router, prefix="/api/v1")
 app.include_router(cogs.router, prefix="/api/v1")
+app.include_router(reports.router, prefix="/api/v1")

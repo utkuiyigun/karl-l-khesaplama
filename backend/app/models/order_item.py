@@ -6,11 +6,15 @@ müşteri tarafından değiştirilirse eski siparişlerin kâr hesabı bozulmas�
 diye tarihsel doğruluk için kalem üzerine kopyalanır.
 """
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.shipment_package import ShipmentPackage
 
 
 class OrderItem(Base, TimestampMixin):
@@ -60,3 +64,5 @@ class OrderItem(Base, TimestampMixin):
         server_default="0",
         nullable=False,
     )
+
+    package: Mapped["ShipmentPackage"] = relationship(back_populates="items")

@@ -8,12 +8,17 @@ status alanı PLATFORM-AGNOSTİK enum'u kullanır (PackageStatus).
 raw_status ham platform değerini debug için saklar.
 """
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum, ForeignKey, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.adapters.base.types import PackageStatus
 from app.db.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.order import Order
+    from app.models.order_item import OrderItem
 
 
 class ShipmentPackage(Base, TimestampMixin):
@@ -51,4 +56,11 @@ class ShipmentPackage(Base, TimestampMixin):
         default=Decimal("0"),
         server_default="0",
         nullable=False,
+    )
+
+    order: Mapped["Order"] = relationship(back_populates="packages")
+    items: Mapped[list["OrderItem"]] = relationship(
+        back_populates="package",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
