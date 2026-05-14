@@ -1,10 +1,9 @@
 """
 Melon-Kar Backend — FastAPI app entry point.
-
-Bu dosya iskelet olarak konuldu. Claude Code geliştirme sırasında genişletecek.
 """
 from fastapi import FastAPI
 
+from app.api.v1 import connections, customers
 from app.core.config import settings
 
 app = FastAPI(
@@ -19,7 +18,6 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# TODO: Claude Code router'ları buraya bağlayacak
-# from app.api.v1 import auth, customers, connections, orders, products, reports, simulations
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-# ...
+# v1 router'ları
+app.include_router(customers.router, prefix="/api/v1")
+app.include_router(connections.router, prefix="/api/v1")
