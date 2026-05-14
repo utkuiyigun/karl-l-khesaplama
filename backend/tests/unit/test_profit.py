@@ -6,16 +6,17 @@ Hesaplama motoru testleri.
 
 Senaryo listesi: docs/HESAPLAMA_MOTORU.md §8
 
-TODO[claude-code]:
-- Her senaryo (A-G) için ayrı test fonksiyonu
-- Fixture'ları tests/fixtures/scenarios/*.json
-- pytest.mark.parametrize ile senaryoları döngüye al
+Implementasyon stratejisi:
+- inline Python dataclass'lar ile senaryo tanımlanır (tip güvenli, IDE-friendly)
+- Beklenen sonuçlar yorumda hesap adımıyla birlikte yazılır
+- Tüm para alanları Decimal; karşılaştırma tam değerle
 """
 from decimal import Decimal
 
 import pytest
 
 from app.adapters.base.types import OrderItem, PackageStatus, ShipmentPackage
+from app.calculators.profit import calculate_item_profit, calculate_package_profit
 
 
 @pytest.fixture
@@ -33,48 +34,87 @@ def simple_delivered_item() -> OrderItem:
     )
 
 
-@pytest.mark.skip(reason="TODO[claude-code]: implement after writing profit.calculate_item_profit")
-def test_senaryo_a_basit_teslim(simple_delivered_item: OrderItem) -> None:
+def test_senaryo_a_basit_teslim_item(simple_delivered_item: OrderItem) -> None:
     """
-    Senaryo A: 100 TL satış, %18 komisyon, KDV %20, 40 TL COGS.
-    
-    Beklenen net kâr hesabını docs/HESAPLAMA_MOTORU.md'den manuel hesapla,
-    burada assertion olarak yaz.
+    Senaryo A — KALEM seviyesi.
+
+    Input:
+        unit_sale_price = 100 TL (KDV %20 dahil)
+        quantity = 1, return = 0
+        commission_rate = 0.18
+        vat_rate = 0.20
+        cogs = 40 TL
+
+    Hesap (HESAPLAMA §2.1):
+        gross_revenue = 100 × 1               = 100.00
+        net_sale      = 100 − 0 (kampanya)    = 100.00
+        commission    = 100 × 0.18            =  18.00
+        sale_vat      = 100 × 0.20 / 1.20     =  16.67  (16.6666... yuvarlandı)
+        total_cogs    = 40 × 1                =  40.00
+        item_net      = 100 − 18 − 16.67 − 40 =  25.33
     """
-    pass
+    r = calculate_item_profit(simple_delivered_item)
+
+    assert r.gross_revenue == Decimal("100.00")
+    assert r.commission == Decimal("18.00")
+    assert r.sale_vat == Decimal("16.67")
+    assert r.total_cogs == Decimal("40.00")
+    assert r.service_fee == Decimal("0.00"), "Kalem seviyesinde paket bedeli olmamalı"
+    assert r.shipping_cost == Decimal("0.00"), "Kalem seviyesinde kargo olmamalı"
+    assert r.net_profit == Decimal("25.33")
 
 
-@pytest.mark.skip(reason="TODO[claude-code]")
+def test_senaryo_a_basit_teslim_package(simple_delivered_item: OrderItem) -> None:
+    """
+    Senaryo A — PAKET seviyesi (HESAPLAMA §2.2).
+
+    Aynı kalem + 13.19 TL hizmet bedeli + 0 TL kargo + Delivered:
+        package_net = 25.33 − 13.19 − 0 = 12.14
+    """
+    package = ShipmentPackage(
+        external_id="pkg-1",
+        status=PackageStatus.DELIVERED,
+        items=[simple_delivered_item],
+        package_service_fee=Decimal("13.19"),
+        shipping_cost=Decimal("0"),
+    )
+    r = calculate_package_profit(package)
+
+    assert r.gross_revenue == Decimal("100.00")
+    assert r.commission == Decimal("18.00")
+    assert r.sale_vat == Decimal("16.67")
+    assert r.service_fee == Decimal("13.19")
+    assert r.shipping_cost == Decimal("0.00")
+    assert r.total_cogs == Decimal("40.00")
+    assert r.net_profit == Decimal("12.14")
+    assert r.is_realized is True
+
+
+@pytest.mark.skip(reason="TODO[2.2]: kısmi iade")
 def test_senaryo_b_kismi_iade() -> None:
-    """Senaryo B: 2 adet ürünün 1'i iade edildi."""
     pass
 
 
-@pytest.mark.skip(reason="TODO[claude-code]")
+@pytest.mark.skip(reason="TODO[2.2]: tam iptal")
 def test_senaryo_c_tam_iptal() -> None:
-    """Senaryo C: Cancelled → net etki 0."""
     pass
 
 
-@pytest.mark.skip(reason="TODO[claude-code]")
+@pytest.mark.skip(reason="TODO[2.2]: kampanya indirimi")
 def test_senaryo_d_kampanya_indirimi() -> None:
-    """Senaryo D: Komisyon indirimli fiyat üzerinden hesaplanmalı."""
     pass
 
 
-@pytest.mark.skip(reason="TODO[claude-code]")
+@pytest.mark.skip(reason="TODO[2.2]: çoklu paket karışık statü")
 def test_senaryo_e_coklu_paket_karisik_statu() -> None:
-    """Senaryo E: 2 paket, biri Delivered biri Returned."""
     pass
 
 
-@pytest.mark.skip(reason="TODO[claude-code]")
+@pytest.mark.skip(reason="TODO[2.3]: KDV mükellef değil")
 def test_senaryo_f_kdv_mukellef_degil() -> None:
-    """Senaryo F: KDV mahsuplaşması yok, tüm KDV gider."""
     pass
 
 
-@pytest.mark.skip(reason="TODO[claude-code]")
+@pytest.mark.skip(reason="TODO[2.3]: stopajlı")
 def test_senaryo_g_stopajli() -> None:
-    """Senaryo G: %5 stopaj net kârdan düşer."""
     pass
