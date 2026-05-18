@@ -11,6 +11,7 @@ const TABS = [
   { href: "", label: "Özet" },
   { href: "/orders", label: "Siparişler" },
   { href: "/products", label: "Ürün Kârlılığı" },
+  { href: "/price-simulator", label: "Fiyat Simülatörü" },
   { href: "/simulations", label: "Kampanya Simülatörü" },
   { href: "/cogs", label: "COGS Yükle" },
   { href: "/connections", label: "Bağlantılar" },

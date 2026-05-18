@@ -66,8 +66,45 @@ export type ShipmentPackageRead = {
   items: OrderItemRead[];
 };
 
+export type TrendyolBreakdown = {
+  gross_amount: string | null;
+  total_discount: string | null;
+  seller_discount: string | null;
+  ty_discount: string | null;
+  total_price: string | null;
+  cargo_provider: string | null;
+  cargo_tracking_number: string | null;
+  delivery_type: string | null;
+};
+
 export type OrderDetail = OrderSummary & {
   packages: ShipmentPackageRead[];
+  trendyol_breakdown: TrendyolBreakdown | null;
+};
+
+export type PriceSimulatorRequest = {
+  sale_price: string;
+  vat_rate?: string;
+  commission_rate: string;
+  cogs?: string;
+  quantity?: number;
+  campaign_discount?: string;
+  package_service_fee?: string;
+  shipping_cost?: string;
+};
+
+export type PriceSimulatorResponse = {
+  gross_revenue: string;
+  campaign_discount: string;
+  net_sale: string;
+  commission: string;
+  service_fee: string;
+  shipping_cost: string;
+  sale_vat: string;
+  total_cogs: string;
+  stopaj: string;
+  seller_payout: string;
+  net_profit: string;
 };
 
 export type ProductProfitabilityRow = {

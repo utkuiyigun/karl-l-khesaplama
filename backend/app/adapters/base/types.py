@@ -59,6 +59,7 @@ class Order:
     customer_id: int             # İç müşteri ID
     platform_connection_id: int
     packages: list[ShipmentPackage] = field(default_factory=list)
+    raw_data: dict | None = None  # ham platform response — debug/rapor için
 
 
 @dataclass

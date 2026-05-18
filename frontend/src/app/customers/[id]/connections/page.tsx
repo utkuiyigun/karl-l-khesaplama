@@ -25,7 +25,8 @@ export default function ConnectionsPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
+    const formEl = e.currentTarget; // React event pooling — async sonra null olmasın diye baştan al
+    const form = new FormData(formEl);
     setSubmitting(true);
     setError(null);
     try {
@@ -35,7 +36,7 @@ export default function ConnectionsPage() {
         api_key: String(form.get("api_key")),
         api_secret: String(form.get("api_secret")),
       });
-      (e.currentTarget as HTMLFormElement).reset();
+      formEl.reset();
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));

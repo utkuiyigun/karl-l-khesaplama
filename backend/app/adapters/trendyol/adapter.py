@@ -55,16 +55,37 @@ def _to_decimal(value: Any) -> Decimal:
 
 
 def _build_order_item(line: dict[str, Any]) -> OrderItem:
-    # Trendyol KDV oranını yüzde olarak verir (örn 20 = %20). Bizde 0.20 (oran).
-    vat_pct = _to_decimal(line.get("vatBaseAmount", 0))
+    # KDV: gerçek API'de `vatRate` (örn 20.0), eski test fixture'ında `vatBaseAmount`.
+    vat_pct = _to_decimal(line.get("vatRate", line.get("vatBaseAmount", 0)))
     vat_rate = vat_pct / Decimal("100")
 
-    # Toplam indirim: 3 farklı kaynak (kampanya, Trendyol, satıcı)
-    discount = (
-        _to_decimal(line.get("discount", 0))
-        + _to_decimal(line.get("tyDiscount", 0))
-        + _to_decimal(line.get("merchantDiscount", 0))
+    # Komisyon: gerçek API'de `commission` (yüzde, 12 = %12).
+    # Eski fixture (test) ile geriye dönük uyumluluk için `commissionRate` (oran) destekli.
+    if "commission" in line:
+        commission_rate = _to_decimal(line["commission"]) / Decimal("100")
+    else:
+        commission_rate = _to_decimal(line.get("commissionRate", 0))
+
+    # Brüt birim fiyat: Trendyol'un `price` alanı ZATEN indirimli (örn 2070).
+    # Brüt `amount` veya `lineGrossAmount` verir (örn 2300). Brütü tercih et,
+    # indirimi `campaign_discount` olarak ayrı tut — hesap motoru net_sale = gross - discount
+    # şeklinde işliyor (HESAPLAMA §2.1).
+    quantity = int(line.get("quantity", 1))
+    line_gross = _to_decimal(line.get("amount", line.get("lineGrossAmount", line.get("price", 0))))
+    unit_sale_price = (
+        line_gross / Decimal(quantity) if quantity > 0 else line_gross
     )
+
+    # Toplam indirim: gerçek API'de lineTotalDiscount; eski fixture'da
+    # discount + tyDiscount + merchantDiscount toplamı.
+    if "lineTotalDiscount" in line:
+        discount = _to_decimal(line["lineTotalDiscount"])
+    else:
+        discount = (
+            _to_decimal(line.get("discount", 0))
+            + _to_decimal(line.get("tyDiscount", 0))
+            + _to_decimal(line.get("merchantDiscount", 0))
+        )
 
     product_code = line.get("productCode")
 
@@ -72,28 +93,34 @@ def _build_order_item(line: dict[str, Any]) -> OrderItem:
         external_id=str(line["id"]),
         product_id=str(product_code) if product_code is not None else None,
         barcode=str(line.get("barcode", "")),
-        quantity=int(line.get("quantity", 0)),
-        unit_sale_price=_to_decimal(line.get("price", 0)),
+        quantity=quantity,
+        unit_sale_price=unit_sale_price,
         vat_rate=vat_rate,
-        commission_rate=_to_decimal(line.get("commissionRate", 0)),
+        commission_rate=commission_rate,
         campaign_discount=discount,
-        cogs=Decimal("0"),  # COGS müşteri yüklemesi sırasında doldurulur
+        cogs=Decimal("0"),  # COGS müşteri yüklemesinden gelir
     )
 
 
 def _build_packages(
     lines: list[dict[str, Any]],
-    fallback_status: str | None,
+    raw_order: dict[str, Any],
 ) -> list[ShipmentPackage]:
-    """lines'ı shipmentPackageId'ye göre grupla → paketleri çıkar."""
+    """lines'ı shipmentPackageId'ye göre grupla. Gerçek Trendyol API'sinde
+    shipmentPackageId sipariş seviyesinde; eski fixture'da line'da gelir.
+    İkisini de destekle (line öncelikli, yoksa sipariş üst seviyesi)."""
+    fallback_pkg_id = str(
+        raw_order.get("shipmentPackageId", raw_order.get("id", "single"))
+    )
+    fallback_status = raw_order.get("shipmentPackageStatus", raw_order.get("status"))
+
     groups: dict[str, list[dict[str, Any]]] = {}
     for line in lines:
-        pkg_id = str(line.get("shipmentPackageId", "single"))
+        pkg_id = str(line.get("shipmentPackageId", fallback_pkg_id))
         groups.setdefault(pkg_id, []).append(line)
 
     packages: list[ShipmentPackage] = []
     for pkg_id, group_lines in groups.items():
-        # Önce line-item statüsü, yoksa siparişin paket statüsü
         raw_status = group_lines[0].get("orderLineItemStatusName") or fallback_status
         packages.append(
             ShipmentPackage(
@@ -101,7 +128,7 @@ def _build_packages(
                 status=_map_status(raw_status),
                 items=[_build_order_item(line) for line in group_lines],
                 package_service_fee=DEFAULT_PACKAGE_SERVICE_FEE,
-                shipping_cost=Decimal("0"),  # MVP: müşterinin default_shipping_cost'u sync sırasında uygulanır
+                shipping_cost=Decimal("0"),
             )
         )
     return packages
@@ -117,10 +144,8 @@ def _parse_order(
         order_date=datetime.fromtimestamp(raw["orderDate"] / 1000, tz=timezone.utc),
         customer_id=customer_id,
         platform_connection_id=platform_connection_id,
-        packages=_build_packages(
-            raw.get("lines", []),
-            raw.get("shipmentPackageStatus"),
-        ),
+        packages=_build_packages(raw.get("lines", []), raw),
+        raw_data=raw,  # detayda Trendyol Hesaplaşma Dökümü için ham JSON
     )
 
 

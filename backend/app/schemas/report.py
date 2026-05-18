@@ -55,10 +55,29 @@ class OrderSummary(BaseModel):
     profit: ProfitBreakdown
 
 
+class TrendyolBreakdown(BaseModel):
+    """Trendyol'un sipariş seviyesinde döndürdüğü ham finansal alanlar.
+
+    Sipariş detayında 'Trendyol Hesaplaşma' bölümünde göstermek için raw_data'dan
+    çıkarılır. Kargo/ceza gibi alanlar /orders endpoint'inde GELMEZ —
+    Trendyol'un finans Excel raporu'ndan gelir (sonraki Faz'da import edilebilir).
+    """
+
+    gross_amount: Decimal | None = None
+    total_discount: Decimal | None = None
+    seller_discount: Decimal | None = None
+    ty_discount: Decimal | None = None
+    total_price: Decimal | None = None  # indirim sonrası satıcının tahsil edeceği tutar
+    cargo_provider: str | None = None
+    cargo_tracking_number: str | None = None
+    delivery_type: str | None = None
+
+
 class OrderDetail(OrderSummary):
     """Detay endpoint'inde paketler de gelir."""
 
     packages: list[ShipmentPackageRead]
+    trendyol_breakdown: TrendyolBreakdown | None = None
 
 
 class ProductProfitabilityRow(BaseModel):

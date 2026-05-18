@@ -8,6 +8,8 @@ import type {
   OrderSummary,
   Page,
   PlatformConnection,
+  PriceSimulatorRequest,
+  PriceSimulatorResponse,
   ProductProfitabilityRow,
   SimulationResponse,
 } from "./types";
@@ -131,6 +133,13 @@ export const api = {
       method: "POST",
       json: data,
     }),
+
+  // Price Simulator
+  simulatePrice: (customerId: number, data: PriceSimulatorRequest) =>
+    request<PriceSimulatorResponse>(
+      `/customers/${customerId}/price-simulator`,
+      { method: "POST", json: data }
+    ),
 };
 
 export { ApiError };

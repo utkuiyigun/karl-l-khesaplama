@@ -119,14 +119,14 @@ async def _upsert_order(session: AsyncSession, domain_order: DomainOrder) -> Non
             platform_connection_id=domain_order.platform_connection_id,
             external_id=domain_order.external_id,
             order_date=domain_order.order_date,
-            raw_data={},
+            raw_data=domain_order.raw_data or {},
         )
         session.add(order_row)
         await session.flush()
     else:
         order_row = existing
         order_row.order_date = domain_order.order_date
-        # raw_data güncellenmiyor şimdilik
+        order_row.raw_data = domain_order.raw_data or order_row.raw_data
         # Eski paketleri sil (CASCADE order_items'ı da siler)
         await session.execute(
             delete(ShipmentPackageModel).where(ShipmentPackageModel.order_id == order_row.id)

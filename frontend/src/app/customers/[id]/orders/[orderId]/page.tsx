@@ -110,6 +110,61 @@ export default function OrderDetailPage() {
         </ul>
       </section>
 
+      {order.trendyol_breakdown && (
+        <section>
+          <h2 className="mb-3 font-semibold">Trendyol Hesaplaşma (ham)</h2>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {order.trendyol_breakdown.gross_amount && (
+                <Kv label="Brüt Tutar" value={formatTL(order.trendyol_breakdown.gross_amount)} />
+              )}
+              {order.trendyol_breakdown.total_discount && (
+                <Kv
+                  label="Toplam İndirim"
+                  value={formatTL(order.trendyol_breakdown.total_discount)}
+                />
+              )}
+              {order.trendyol_breakdown.seller_discount && (
+                <Kv
+                  label="Satıcı İndirimi"
+                  value={formatTL(order.trendyol_breakdown.seller_discount)}
+                />
+              )}
+              {order.trendyol_breakdown.ty_discount && (
+                <Kv
+                  label="Trendyol İndirimi"
+                  value={formatTL(order.trendyol_breakdown.ty_discount)}
+                />
+              )}
+              {order.trendyol_breakdown.total_price && (
+                <Kv
+                  label="Tutar (indirimli)"
+                  value={formatTL(order.trendyol_breakdown.total_price)}
+                />
+              )}
+              {order.trendyol_breakdown.cargo_provider && (
+                <Kv label="Kargo" value={order.trendyol_breakdown.cargo_provider} />
+              )}
+              {order.trendyol_breakdown.cargo_tracking_number && (
+                <Kv
+                  label="Takip No"
+                  value={order.trendyol_breakdown.cargo_tracking_number}
+                  mono
+                />
+              )}
+              {order.trendyol_breakdown.delivery_type && (
+                <Kv label="Teslimat" value={order.trendyol_breakdown.delivery_type} />
+              )}
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              ⚠️ Trendyol /orders API'si <strong>gönderi kargo bedeli</strong> ve{" "}
+              <strong>diğer hesaplaşma kalemlerini</strong> bu endpoint'te döndürmez —
+              bunlar finans Excel raporundan gelir. Sonraki adımda Excel import'u eklenebilir.
+            </p>
+          </div>
+        </section>
+      )}
+
       <section>
         <h2 className="mb-3 font-semibold">Paketler ({order.packages.length})</h2>
         <div className="space-y-4">
@@ -170,6 +225,23 @@ export default function OrderDetailPage() {
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+function Kv({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wider text-slate-500">{label}</div>
+      <div className={`mt-0.5 text-sm ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>
   );
 }

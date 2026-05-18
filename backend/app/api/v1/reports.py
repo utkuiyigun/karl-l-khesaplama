@@ -26,6 +26,7 @@ from app.schemas.report import (
     ShipmentPackageRead,
     SimulationRequest,
     SimulationResponse,
+    TrendyolBreakdown,
 )
 from app.services.reports import (
     get_order_with_profit,
@@ -48,6 +49,28 @@ def _profit_to_schema(p: ProfitResult) -> ProfitBreakdown:
         stopaj=p.stopaj,
         net_profit=p.net_profit,
         is_realized=p.is_realized,
+    )
+
+
+def _extract_trendyol_breakdown(raw: dict | None) -> TrendyolBreakdown | None:
+    """Ham Trendyol order JSON'undan finansal alanları ayıkla."""
+    if not raw:
+        return None
+
+    def _dec(key: str) -> Decimal | None:
+        v = raw.get(key)
+        return Decimal(str(v)) if v is not None else None
+
+    tracking = raw.get("cargoTrackingNumber")
+    return TrendyolBreakdown(
+        gross_amount=_dec("grossAmount") or _dec("packageGrossAmount"),
+        total_discount=_dec("totalDiscount") or _dec("packageTotalDiscount"),
+        seller_discount=_dec("packageSellerDiscount"),
+        ty_discount=_dec("totalTyDiscount") or _dec("packageTyDiscount"),
+        total_price=_dec("totalPrice") or _dec("packageTotalPrice"),
+        cargo_provider=raw.get("cargoProviderName"),
+        cargo_tracking_number=str(tracking) if tracking is not None else None,
+        delivery_type=raw.get("deliveryType"),
     )
 
 
@@ -98,6 +121,7 @@ async def get_order(
             )
             for pkg in order.packages
         ],
+        trendyol_breakdown=_extract_trendyol_breakdown(order.raw_data),
     )
 
 
